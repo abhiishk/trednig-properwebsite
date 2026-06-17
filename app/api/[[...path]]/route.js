@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
+import { handleUpload } from '@vercel/blob/client'
 
 const MONGO_URL = process.env.MONGO_URL
 const DB_NAME = process.env.DB_NAME || 'trendyprompt'
@@ -302,6 +303,52 @@ export async function POST(req, ctx) {
       }
       const token = await issueToken()
       return json({ token })
+    }
+
+    // Vercel Blob client-upload token handshake.
+    // The client posts the standard handleUpload body. We authenticate via the
+    // admin Bearer token embedded inside clientPayload (since @vercel/blob/client
+    // upload() can't set custom headers).
+    if (path[0] === 'blob' && path[1] === 'upload-token') {
+      const body = await req.json().catch(() => null)
+      if (!body) return err('Invalid body', 400)
+      try {
+        const jsonResponse = await handleUpload({
+          request: req,
+          body,
+          onBeforeGenerateToken: async (pathname, clientPayload) => {
+            let payload = {}
+            if (typeof clientPayload === 'string') {
+              try { payload = JSON.parse(clientPayload) } catch {}
+            }
+            const tok = payload.authToken
+            if (!tok) throw new Error('Unauthorized')
+            const database2 = await getDb()
+            const found = await database2.collection('admin_tokens').findOne({ token: tok })
+            if (!found) throw new Error('Unauthorized')
+            const isVideo = (payload.contentType || '').startsWith('video/')
+            const nowSec = Math.floor(Date.now() / 1000)
+            return {
+              access: 'public',
+              allowedContentTypes: [
+                'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+                'video/mp4', 'video/webm', 'video/quicktime',
+              ],
+              maximumSizeInBytes: isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024,
+              validUntil: nowSec + 10 * 60, // 10 min for large videos
+              tokenPayload: JSON.stringify({ pathname }),
+            }
+          },
+          onUploadCompleted: async () => {
+            // Not used \u2014 we save the URL from the client side.
+          },
+        })
+        return json(jsonResponse)
+      } catch (e) {
+        if (String(e.message).includes('Unauthorized')) return err('Unauthorized', 401)
+        console.error('blob upload-token error', e)
+        return err('Blob upload setup failed: ' + e.message, 500)
+      }
     }
 
     // Create prompt (admin)

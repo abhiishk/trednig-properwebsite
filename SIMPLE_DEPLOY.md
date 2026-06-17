@@ -76,10 +76,27 @@ After Step 0, you'll see a folder (repository) on GitHub called `trendyprompt`. 
 
 ## 🔓 STEP 4 — Use admin panel
 
-1. On your live site → click 🔒 **lock icon** (top right)
+1. On your live site → **go to `yourdomain.com/admin`** (this is the new admin URL — no visible button on the homepage anymore for security!)
 2. Enter your `ADMIN_PASSWORD`
 3. Click ⚙️ to add WhatsApp/Telegram/Instagram links
 4. Click **"New post"** to add your first real prompt!
+
+---
+
+## 🎬 STEP 4.5 — Enable Video File Uploads (Vercel Blob)
+
+To upload video files directly from admin (instead of pasting URLs), enable Vercel Blob storage. **This is FREE up to 1 GB:**
+
+1. Go to **https://vercel.com/dashboard** → click your project
+2. Click **"Storage"** tab (top menu)
+3. Click **"Create Database"** → pick **"Blob"** → click **"Continue"**
+4. Name: `media` → **"Create"**
+5. Click **"Connect Project"** → select your project → check ☑️ Production, Preview, Development → **"Connect"**
+6. Vercel auto-adds the `BLOB_READ_WRITE_TOKEN` env variable for you
+7. Go to **"Deployments"** → click ⋯ on latest → **"Redeploy"** (so the new env var takes effect)
+8. After 1 minute, video uploads in admin will work! 🎉
+
+**Note:** Images can still upload without this (small images stored inline). But for videos, Blob is required.
 
 ---
 
