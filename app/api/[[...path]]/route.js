@@ -180,20 +180,28 @@ const SEED_PROMPTS = [
 
 async function seedIfEmpty() {
   const database = await getDb()
+  // Atomic guard: only one process can seed
+  const guard = await database.collection('settings').findOneAndUpdate(
+    { id: 'seed_lock' },
+    { $setOnInsert: { id: 'seed_lock', seededAt: Date.now() } },
+    { upsert: true, returnDocument: 'before' }
+  )
+  const existed = guard?.value || guard
+  if (existed) return 0 // already seeded by someone
   const count = await database.collection('prompts').countDocuments()
-  if (count === 0) {
-    const now = Date.now()
-    const docs = SEED_PROMPTS.map((p, i) => ({
-      id: uuidv4(),
-      ...p,
-      published: true,
-      createdAt: now - i * 1000,
-      updatedAt: now - i * 1000,
-    }))
-    await database.collection('prompts').insertMany(docs)
-    return docs.length
-  }
-  return 0
+  if (count > 0) return 0
+  const now = Date.now()
+  const docs = SEED_PROMPTS.map((p, i) => ({
+    id: uuidv4(),
+    ...p,
+    videoUrl: p.videoUrl || '',
+    trending: [0, 2, 4, 7].includes(i),
+    published: true,
+    createdAt: now - i * 1000,
+    updatedAt: now - i * 1000,
+  }))
+  await database.collection('prompts').insertMany(docs)
+  return docs.length
 }
 
 export async function GET(req, ctx) {
@@ -220,6 +228,7 @@ export async function GET(req, ctx) {
       if (!adminAll) filter.published = true
       if (type && ['image', 'video'].includes(type)) filter.type = type
       if (tool) filter.tools = tool
+      if (url.searchParams.get('trending') === '1') filter.trending = true
       if (search) {
         filter.$or = [
           { title: { $regex: search, $options: 'i' } },
@@ -227,9 +236,12 @@ export async function GET(req, ctx) {
           { tools: { $regex: search, $options: 'i' } },
         ]
       }
+      const sort = url.searchParams.get('trending') === '1'
+        ? { trending: -1, createdAt: -1 }
+        : { createdAt: -1 }
       const items = await database.collection('prompts')
         .find(filter)
-        .sort({ createdAt: -1 })
+        .sort(sort)
         .limit(200)
         .toArray()
       const cleaned = items.map(({ _id, ...rest }) => rest)
@@ -242,6 +254,13 @@ export async function GET(req, ctx) {
       if (!doc) return err('Not found', 404)
       const { _id, ...rest } = doc
       if (!rest.published && !(await isAuthed(req))) return err('Not found', 404)
+      return json(rest)
+    }
+
+    if (path[0] === 'settings' && path.length === 1) {
+      const doc = await database.collection('settings').findOne({ id: 'social' })
+      const defaults = { id: 'social', whatsapp: '', telegram: '', instagram: '', youtube: '', twitter: '', tagline: '' }
+      const { _id, ...rest } = (doc || defaults)
       return json(rest)
     }
 
@@ -283,9 +302,11 @@ export async function POST(req, ctx) {
         type: body.type === 'video' ? 'video' : 'image',
         tools: Array.isArray(body.tools) ? body.tools : [],
         thumbnail: body.thumbnail || '',
+        videoUrl: body.videoUrl || '',
         prompt: String(body.prompt),
         instructions: Array.isArray(body.instructions) ? body.instructions.filter(Boolean) : [],
         toolLinks: Array.isArray(body.toolLinks) ? body.toolLinks.filter(t => t && t.name && t.url) : [],
+        trending: !!body.trending,
         published: body.published !== false,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -313,7 +334,7 @@ export async function PUT(req, ctx) {
       const id = path[1]
       const body = await req.json().catch(() => ({}))
       const update = {}
-      const fields = ['title', 'type', 'tools', 'thumbnail', 'prompt', 'instructions', 'toolLinks', 'published']
+      const fields = ['title', 'type', 'tools', 'thumbnail', 'videoUrl', 'prompt', 'instructions', 'toolLinks', 'published', 'trending']
       for (const f of fields) if (f in body) update[f] = body[f]
       update.updatedAt = Date.now()
       const res = await database.collection('prompts').findOneAndUpdate(
@@ -323,6 +344,21 @@ export async function PUT(req, ctx) {
       )
       const doc = res?.value || res // mongo driver variations
       if (!doc) return err('Not found', 404)
+      const { _id, ...rest } = doc
+      return json(rest)
+    }
+
+    if (path[0] === 'settings' && path.length === 1) {
+      const body = await req.json().catch(() => ({}))
+      const allowed = ['whatsapp', 'telegram', 'instagram', 'youtube', 'twitter', 'tagline']
+      const update = { id: 'social', updatedAt: Date.now() }
+      for (const f of allowed) if (f in body) update[f] = String(body[f] || '')
+      await database.collection('settings').updateOne(
+        { id: 'social' },
+        { $set: update },
+        { upsert: true }
+      )
+      const doc = await database.collection('settings').findOne({ id: 'social' })
       const { _id, ...rest } = doc
       return json(rest)
     }

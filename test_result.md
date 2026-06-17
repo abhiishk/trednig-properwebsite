@@ -228,6 +228,62 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ RE-VERIFIED - Authorization enforcement working correctly with MongoDB-backed tokens. POST/PUT/DELETE all return 401 without token. GET /api/admin/check returns {authed:false} without token and {authed:true} with valid token. All protected operations work with valid Bearer token."
+  - task: "Prompts support videoUrl and trending fields"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added videoUrl (string) and trending (boolean) fields to prompts. POST/PUT support these fields. GET /api/prompts?trending=1 filters for trending prompts only."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - POST /api/prompts with videoUrl and trending=true creates prompt correctly (test ID: 6f5e304e-aa0a-496f-a3cb-e5750f4f8681). GET /api/prompts?trending=1 returns only trending prompts (found 5: 4 seeded + 1 test). PUT /api/prompts/:id successfully updates trending=false and videoUrl='https://newurl.com/x.mp4', changes persisted on subsequent GET. Test prompt deleted successfully for cleanup."
+  - task: "GET /api/settings endpoint (public)"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/settings (no auth required) returns social links object with keys: whatsapp, telegram, instagram, youtube, twitter, tagline. Returns defaults (empty strings) if never set. MongoDB _id excluded from response."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/settings (no auth) returns 200 with all 6 required fields (whatsapp, telegram, instagram, youtube, twitter, tagline). MongoDB _id correctly excluded from response."
+  - task: "PUT /api/settings endpoint (admin)"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "PUT /api/settings requires admin Bearer token (401 without auth). Updates social links (whatsapp, telegram, instagram, youtube, twitter, tagline). Only allowed fields are stored, arbitrary fields ignored. Empty strings allowed for clearing values."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - PUT /api/settings without auth correctly returns 401. With auth, successfully updates all 6 fields and persists across GET requests. Unknown field 'hacker' correctly ignored, only whatsapp updated. Empty tagline ('') successfully clears the field."
+  - task: "Auto-seed idempotency with seed_lock"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Auto-seed uses atomic findOneAndUpdate with seed_lock guard to prevent duplicate seeding on parallel/repeated GET requests."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Auto-seed idempotency verified. Made 6 consecutive GET /api/prompts requests, count remained stable at 9 prompts (no duplicates created). Seed lock working correctly."
 
 frontend:
   - task: "Public site UI"
@@ -241,29 +297,31 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
 
 test_plan:
   current_focus:
-    - "Auto-seed prompts on first GET"
-    - "GET /api/prompts with filters (search, type, tool)"
-    - "GET /api/prompts/:id detail"
-    - "POST /api/admin/login returns token"
-    - "POST /api/prompts (admin) create"
-    - "PUT /api/prompts/:id (admin) update"
-    - "DELETE /api/prompts/:id (admin)"
-    - "Authorization enforcement"
+    - "Prompts support videoUrl and trending fields"
+    - "GET /api/settings endpoint (public)"
+    - "PUT /api/settings endpoint (admin)"
+    - "Auto-seed idempotency with seed_lock"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
     message: |
-      Initial TrendyPrompt MVP complete. Backend uses MongoDB collection 'prompts' in DB 'trendyprompt'.
-      Admin password from .env (ADMIN_PASSWORD=trendyprompt2025). Tokens are in-memory.
-      Please test all endpoints: GET list w/ filters, GET detail, admin login, create/update/delete
-      with and without valid Bearer token. Verify 401s, 404s, and that unpublished items hide from public.
+      Added new features: videoUrl + trending on prompts, /api/settings endpoint (GET public, PUT admin) for social links (whatsapp/telegram/instagram/youtube/twitter/tagline).
+      Please retest:
+      1. POST a prompt with type=video, videoUrl=https://example.com/v.mp4, trending=true. Verify it's saved and returned.
+      2. GET /api/prompts?trending=1 returns only trending prompts.
+      3. PUT /api/prompts/:id with {trending:false, videoUrl:"new.mp4"} updates.
+      4. GET /api/settings (no auth) returns object with default empty fields if never set.
+      5. PUT /api/settings without auth → 401.
+      6. PUT /api/settings with auth + {whatsapp, telegram, instagram, youtube, twitter, tagline} → 200 and persists across GET.
+      7. PUT /api/settings ignores arbitrary fields (e.g. {hacker:"x"}) — only stores allowed keys.
+      8. Auto-seed should NOT duplicate on parallel/repeated calls (seed_lock guard added).
   - agent: "testing"
     message: |
       Backend testing complete. All 8 backend tasks tested successfully with 21/21 tests passing.
@@ -294,3 +352,25 @@ agent_communication:
       - DELETE /api/prompts/:id: no auth → 401, with auth → 200 {ok:true}
       
       MongoDB token refactor successful. All auth flows working correctly.
+  - agent: "testing"
+    message: |
+      NEW FEATURES TESTING COMPLETE - All 11/11 tests passing.
+      
+      ✅ A) Prompts with videoUrl and trending fields (4 tests):
+      - POST /api/prompts with videoUrl and trending=true → 200, fields correctly saved and returned
+      - GET /api/prompts?trending=1 → returns only trending prompts (found 5: 4 seeded + 1 test)
+      - PUT /api/prompts/:id with trending=false and new videoUrl → 200, changes persisted
+      - DELETE test prompt → 200, cleanup successful
+      
+      ✅ B) /api/settings endpoint (6 tests):
+      - GET /api/settings (no auth) → 200, returns all 6 fields (whatsapp, telegram, instagram, youtube, twitter, tagline), no _id
+      - PUT /api/settings (no auth) → 401 correctly
+      - PUT /api/settings (with auth) → 200, all fields saved and persisted
+      - GET /api/settings after update → all values persisted correctly
+      - PUT /api/settings with unknown field "hacker" → ignored, only whatsapp updated
+      - PUT /api/settings with empty tagline → cleared to empty string successfully
+      
+      ✅ C) Auto-seed idempotency (1 test):
+      - Made 6 consecutive GET /api/prompts requests → count stable at 9, no duplicates created
+      
+      All new features working correctly. No critical issues found.
