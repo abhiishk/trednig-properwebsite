@@ -79,6 +79,11 @@ You'll set up three things, all **free**:
 
 7. Open it. The 8 sample prompts will auto-seed on the first visit.
 8. Visit `/#/admin` and log in with your `ADMIN_PASSWORD` to start creating real posts.
+9. **Set your social channels**: in admin, click the ⚙️ Settings icon → paste your WhatsApp Channel / Telegram / Instagram / YouTube / X URLs → Save. They'll appear automatically in the footer + the floating WhatsApp button activates site-wide.
+
+> 💡 **Adding videos**: When creating a video prompt, just paste a direct **MP4 URL** (e.g., from Cloudflare R2, Vercel Blob, or any direct video link). Videos autoplay muted on cards and unmute on tap. The detail page has full video controls.
+
+> 🔥 **Marking trending**: Toggle the 🔥 flame icon next to any prompt in the admin list — it'll show up under the **Trending** tab and get a gradient "Trending" badge on its card.
 
 ---
 
