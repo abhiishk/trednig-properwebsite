@@ -166,6 +166,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ PASSED - Wrong password correctly returns 401. Correct password (trendyprompt2025) successfully returns JWT token. Token format validated as UUID."
+      - working: true
+        agent: "testing"
+        comment: "✅ RE-VERIFIED - Auth flow working correctly after MongoDB token refactor. Wrong password returns 401, correct password returns token (ae8fefcc-c737-4af0-8...). Token successfully stored in MongoDB admin_tokens collection."
   - task: "POST /api/prompts (admin) create"
     implemented: true
     working: true
@@ -222,6 +225,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ PASSED - All POST/PUT/DELETE operations correctly return 401 without valid Bearer token. All operations work correctly with valid token. GET /api/admin/check returns falsy value without token and true with valid token."
+      - working: true
+        agent: "testing"
+        comment: "✅ RE-VERIFIED - Authorization enforcement working correctly with MongoDB-backed tokens. POST/PUT/DELETE all return 401 without token. GET /api/admin/check returns {authed:false} without token and {authed:true} with valid token. All protected operations work with valid Bearer token."
 
 frontend:
   - task: "Public site UI"
@@ -273,3 +279,18 @@ agent_communication:
       - Authorization: all protected endpoints return 401 without token
       
       No critical issues found. Backend API is fully functional.
+  - agent: "testing"
+    message: |
+      Re-verification complete after MongoDB token refactor. All 21/21 tests passing.
+      
+      ✅ Auth flow verified with MongoDB-backed tokens:
+      - POST /api/admin/login: wrong password → 401, correct password → 200 with token
+      - Token storage: Successfully stored in MongoDB admin_tokens collection with TTL (30 days)
+      - GET /api/admin/check: no token → {authed:false}, with token → {authed:true}
+      - POST /api/prompts: no auth → 401, with auth → 200 (created test prompt)
+      - PUT /api/prompts/:id: no auth → 401, with auth → 200 (updated to unpublished)
+      - GET /api/prompts: unpublished prompt correctly hidden from public list
+      - GET /api/prompts?all=1: unpublished prompt correctly visible with admin token
+      - DELETE /api/prompts/:id: no auth → 401, with auth → 200 {ok:true}
+      
+      MongoDB token refactor successful. All auth flows working correctly.

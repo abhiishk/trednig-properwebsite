@@ -15,20 +15,29 @@ async function getDb() {
   db = client.db(DB_NAME)
   await db.collection('prompts').createIndex({ createdAt: -1 }).catch(() => {})
   await db.collection('prompts').createIndex({ id: 1 }, { unique: true }).catch(() => {})
+  await db.collection('admin_tokens').createIndex({ token: 1 }, { unique: true }).catch(() => {})
+  await db.collection('admin_tokens').createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 }).catch(() => {})
   return db
 }
 
-// Admin token store (in-memory; fine for MVP)
-const tokens = new Set()
-function issueToken() {
-  const t = uuidv4()
-  tokens.add(t)
-  return t
+// Admin token store (MongoDB-backed so it works across Vercel serverless instances)
+async function issueToken() {
+  const token = uuidv4()
+  const database = await getDb()
+  await database.collection('admin_tokens').insertOne({ token, createdAt: new Date() })
+  return token
 }
-function isAuthed(req) {
+async function isAuthed(req) {
   const auth = req.headers.get('authorization') || ''
   const tok = auth.replace(/^Bearer\s+/i, '').trim()
-  return tok && tokens.has(tok)
+  if (!tok) return false
+  try {
+    const database = await getDb()
+    const found = await database.collection('admin_tokens').findOne({ token: tok })
+    return !!found
+  } catch {
+    return false
+  }
 }
 
 function json(data, init = {}) {
@@ -205,7 +214,7 @@ export async function GET(req, ctx) {
       const search = (url.searchParams.get('search') || '').trim()
       const type = url.searchParams.get('type') // image | video
       const tool = url.searchParams.get('tool')
-      const adminAll = url.searchParams.get('all') === '1' && isAuthed(req)
+      const adminAll = url.searchParams.get('all') === '1' && (await isAuthed(req))
 
       const filter = {}
       if (!adminAll) filter.published = true
@@ -232,12 +241,12 @@ export async function GET(req, ctx) {
       const doc = await database.collection('prompts').findOne({ id })
       if (!doc) return err('Not found', 404)
       const { _id, ...rest } = doc
-      if (!rest.published && !isAuthed(req)) return err('Not found', 404)
+      if (!rest.published && !(await isAuthed(req))) return err('Not found', 404)
       return json(rest)
     }
 
     if (path[0] === 'admin' && path[1] === 'check') {
-      return json({ authed: isAuthed(req) })
+      return json({ authed: await isAuthed(req) })
     }
 
     return err('Not found', 404)
@@ -259,13 +268,13 @@ export async function POST(req, ctx) {
       if (!body.password || body.password !== ADMIN_PASSWORD) {
         return err('Invalid password', 401)
       }
-      const token = issueToken()
+      const token = await issueToken()
       return json({ token })
     }
 
     // Create prompt (admin)
     if (path[0] === 'prompts' && path.length === 1) {
-      if (!isAuthed(req)) return err('Unauthorized', 401)
+      if (!(await isAuthed(req))) return err('Unauthorized', 401)
       const body = await req.json().catch(() => ({}))
       if (!body.title || !body.prompt) return err('title and prompt are required')
       const doc = {
@@ -298,7 +307,7 @@ export async function PUT(req, ctx) {
     const params = await ctx.params
     const path = params?.path || []
     const database = await getDb()
-    if (!isAuthed(req)) return err('Unauthorized', 401)
+    if (!(await isAuthed(req))) return err('Unauthorized', 401)
 
     if (path[0] === 'prompts' && path.length === 2) {
       const id = path[1]
@@ -329,7 +338,7 @@ export async function DELETE(req, ctx) {
     const params = await ctx.params
     const path = params?.path || []
     const database = await getDb()
-    if (!isAuthed(req)) return err('Unauthorized', 401)
+    if (!(await isAuthed(req))) return err('Unauthorized', 401)
 
     if (path[0] === 'prompts' && path.length === 2) {
       const id = path[1]
