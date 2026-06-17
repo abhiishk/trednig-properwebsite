@@ -6,18 +6,31 @@ const MONGO_URL = process.env.MONGO_URL
 const DB_NAME = process.env.DB_NAME || 'trendyprompt'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'trendyprompt2025'
 
-let client
-let db
+// Use a global cached connection across HMR reloads to prevent stale state
+const globalForMongo = globalThis
 async function getDb() {
-  if (db) return db
-  client = new MongoClient(MONGO_URL)
-  await client.connect()
-  db = client.db(DB_NAME)
-  await db.collection('prompts').createIndex({ createdAt: -1 }).catch(() => {})
-  await db.collection('prompts').createIndex({ id: 1 }, { unique: true }).catch(() => {})
-  await db.collection('admin_tokens').createIndex({ token: 1 }, { unique: true }).catch(() => {})
-  await db.collection('admin_tokens').createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 }).catch(() => {})
-  return db
+  if (globalForMongo.__tp_db) return globalForMongo.__tp_db
+  if (globalForMongo.__tp_connecting) return globalForMongo.__tp_connecting
+  if (!MONGO_URL || typeof MONGO_URL !== 'string') {
+    throw new Error('MONGO_URL is not set. Please configure environment variables.')
+  }
+  globalForMongo.__tp_connecting = (async () => {
+    try {
+      const c = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 8000 })
+      await c.connect()
+      const d = c.db(DB_NAME)
+      await d.collection('prompts').createIndex({ createdAt: -1 }).catch(() => {})
+      await d.collection('prompts').createIndex({ id: 1 }, { unique: true }).catch(() => {})
+      await d.collection('admin_tokens').createIndex({ token: 1 }, { unique: true }).catch(() => {})
+      await d.collection('admin_tokens').createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 }).catch(() => {})
+      globalForMongo.__tp_client = c
+      globalForMongo.__tp_db = d
+      return d
+    } finally {
+      globalForMongo.__tp_connecting = null
+    }
+  })()
+  return globalForMongo.__tp_connecting
 }
 
 // Admin token store (MongoDB-backed so it works across Vercel serverless instances)
