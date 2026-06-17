@@ -4,9 +4,21 @@ import { Toaster } from 'sonner'
 export const metadata = {
   title: 'TrendyPrompt — Viral AI Prompts',
   description: 'A curated library of viral AI image and video prompts for ChatGPT, Gemini, Veo, Kling, Midjourney and more.',
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    apple: '/apple-icon.svg',
+    shortcut: '/icon.svg',
+  },
   openGraph: {
     title: 'TrendyPrompt — Viral AI Prompts',
     description: 'Discover, copy, and follow the latest viral AI prompts.',
+    images: ['/apple-icon.svg'],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'TrendyPrompt — Viral AI Prompts',
+    description: 'Discover, copy, and follow the latest viral AI prompts.',
+    images: ['/apple-icon.svg'],
   },
 }
 
