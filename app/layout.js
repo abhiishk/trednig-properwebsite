@@ -1,5 +1,6 @@
 import './globals.css'
 import { Toaster } from 'sonner'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata = {
   title: 'TrendyPrompt — Viral AI Prompts',
@@ -43,6 +44,7 @@ export default function RootLayout({ children }) {
       <body className="antialiased bg-white text-neutral-900">
         {children}
         <Toaster position="top-center" richColors closeButton />
+        <SpeedInsights />
       </body>
     </html>
   )
