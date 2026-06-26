@@ -32,12 +32,26 @@ async function api(path: string, opts: RequestInit & { headers?: Record<string, 
   return data
 }
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string); r.onerror = reject
-    r.readAsDataURL(file)
+async function uploadImageToStorage(file: File): Promise<string> {
+  // Step 1: request a presigned PUT URL from our backend
+  const res = await fetch('/api/storage/uploads/request-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
   })
+  if (!res.ok) throw new Error('Failed to get upload URL')
+  const { uploadURL, objectPath } = await res.json()
+
+  // Step 2: upload the file directly to GCS via the presigned URL (no size limit)
+  const uploadRes = await fetch(uploadURL, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+  if (!uploadRes.ok) throw new Error('Upload to storage failed')
+
+  // objectPath is like /objects/uploads/<uuid> — serving URL is /api/storage + objectPath
+  return `/api/storage${objectPath}`
 }
 
 interface Prompt {
@@ -148,8 +162,11 @@ function Dashboard({ navigate, goHome, onLogout }: { navigate: (h: string) => vo
   const [items, setItems] = useState<Prompt[] | null>(null)
 
   const load = async () => {
-    try { const data = await api('/prompts?all=1'); setItems(data.items || []) }
-    catch (e: any) { toast.error(e.message) }
+    try {
+      // Admin list fetches all pages (up to 200) with thumbnails included via ?all=1
+      const data = await api('/prompts?all=1')
+      setItems(data.items || [])
+    } catch (e: any) { toast.error(e.message) }
   }
   useEffect(() => { load() }, [])
 
@@ -245,9 +262,7 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
-  const [videoUploading, setVideoUploading] = useState(false)
   const imageRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!editId) return
@@ -279,25 +294,14 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
     if (!file.type.startsWith('image/')) { toast.error('Please pick an image file'); return }
     setImageUploading(true)
     try {
-      if (file.size <= 4 * 1024 * 1024) {
-        const url = await fileToDataUrl(file)
-        setField('thumbnail', url)
-        toast.success('Image ready!')
-      } else {
-        toast.error('Image too large (max 4 MB). Please use an image URL instead.')
-      }
-    } catch { toast.error('Upload failed') }
+      const url = await uploadImageToStorage(file)
+      setField('thumbnail', url)
+      toast.success('Image uploaded!')
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed')
+    }
     setImageUploading(false)
     if (imageRef.current) imageRef.current.value = ''
-  }
-
-  const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('video/')) { toast.error('Please pick a video file'); return }
-    toast.info('For video hosting, paste a video URL directly (YouTube, direct mp4, etc.)')
-    setVideoUploading(false)
-    if (videoRef.current) videoRef.current.value = ''
   }
 
   const save = async () => {
@@ -325,7 +329,7 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
           <button onClick={() => navigate('')} className="inline-flex items-center gap-1 text-sm text-neutral-700">
             <ArrowLeft className="w-4 h-4" /> Admin
           </button>
-          <Button size="sm" onClick={save} disabled={saving || imageUploading || videoUploading} className="rounded-full h-8 px-4">
+          <Button size="sm" onClick={save} disabled={saving || imageUploading} className="rounded-full h-8 px-4">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (editId ? 'Save' : 'Publish')}
           </Button>
         </div>
@@ -369,11 +373,16 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
               <div className="grid sm:grid-cols-2 gap-3">
                 <button type="button" onClick={() => imageRef.current?.click()} disabled={imageUploading}
                   className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl bg-neutral-50 hover:bg-neutral-100 transition border border-neutral-200 disabled:opacity-50">
-                  {imageUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  {imageUploading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="text-xs text-neutral-500">Uploading…</span>
+                    </>
+                  ) : (
                     <>
                       <Upload className="w-5 h-5 text-neutral-500" />
                       <span className="text-xs text-neutral-600">Upload image</span>
-                      <span className="text-[10px] text-neutral-400">max 4 MB</span>
+                      <span className="text-[10px] text-neutral-400">any size · stored in cloud</span>
                     </>
                   )}
                 </button>
@@ -470,7 +479,7 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
           </label>
         </div>
 
-        <Button onClick={save} disabled={saving || imageUploading || videoUploading} className="w-full h-12 rounded-xl">
+        <Button onClick={save} disabled={saving || imageUploading} className="w-full h-12 rounded-xl">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editId ? 'Save changes' : 'Publish prompt')}
         </Button>
       </div>

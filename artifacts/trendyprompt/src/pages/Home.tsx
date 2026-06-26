@@ -124,23 +124,48 @@ function SiteHeader({ navigate, currentTab }: { navigate: (h: string) => void; c
 
 function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; trendingOnly: boolean }) {
   const [items, setItems] = useState<Prompt[] | null>(null)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [type, setType] = useState<string | null>(null)
   const [tool, setTool] = useState<string | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
 
-  const load = useCallback(async () => {
-    setItems(null)
+  const buildQs = useCallback((pageNum: number) => {
     const qs = new URLSearchParams()
     if (search) qs.set('search', search)
     if (type) qs.set('type', type)
     if (tool) qs.set('tool', tool)
     if (trendingOnly) qs.set('trending', '1')
-    try {
-      const data = await api(`/prompts?${qs.toString()}`)
-      setItems(data.items || [])
-    } catch (e: any) { toast.error(e.message); setItems([]) }
+    qs.set('page', String(pageNum))
+    return qs.toString()
   }, [search, type, tool, trendingOnly])
+
+  const load = useCallback(async () => {
+    setItems(null)
+    setPage(0)
+    setHasMore(false)
+    try {
+      const data = await api(`/prompts?${buildQs(0)}`)
+      setItems(data.items || [])
+      setHasMore(!!data.hasMore)
+      setTotal(data.total ?? 0)
+    } catch (e: any) { toast.error(e.message); setItems([]) }
+  }, [buildQs])
+
+  const loadMore = async () => {
+    const nextPage = page + 1
+    setLoadingMore(true)
+    try {
+      const data = await api(`/prompts?${buildQs(nextPage)}`)
+      setItems(prev => [...(prev || []), ...(data.items || [])])
+      setHasMore(!!data.hasMore)
+      setPage(nextPage)
+    } catch (e: any) { toast.error(e.message) }
+    setLoadingMore(false)
+  }
 
   useEffect(() => { load() }, [type, tool, trendingOnly])
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [search])
@@ -148,10 +173,8 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
 
   const stats = useMemo(() => {
     if (!items) return null
-    const total = items.length
-    const videos = items.filter(p => p.type === 'video').length
-    return { total, videos, images: total - videos }
-  }, [items])
+    return { total, videos: items.filter(p => p.type === 'video').length, images: items.filter(p => p.type === 'image').length }
+  }, [items, total])
 
   return (
     <div>
@@ -274,11 +297,28 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
         {items === null ? <SkeletonGrid /> : items.length === 0 ? <EmptyState /> : (
-          <div className="masonry">
-            {items.map((p) => (
-              <PromptCard key={p.id} prompt={p} onClick={() => navigate(`/p/${p.id}`)} />
-            ))}
-          </div>
+          <>
+            <div className="masonry">
+              {items.map((p) => (
+                <PromptCard key={p.id} prompt={p} onClick={() => navigate(`/p/${p.id}`)} />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="flex justify-center mt-8 mb-4">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 px-6 h-11 rounded-full border border-neutral-200 bg-white hover:bg-neutral-50 text-sm font-medium text-neutral-700 transition disabled:opacity-60"
+                >
+                  {loadingMore ? (
+                    <><span className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-700 rounded-full animate-spin" /> Loading…</>
+                  ) : (
+                    <>Load more prompts</>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

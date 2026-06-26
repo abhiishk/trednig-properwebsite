@@ -179,10 +179,27 @@ router.get('/prompts', async (req, res) => {
         { tools: { $regex: search, $options: 'i' } },
       ];
     }
+    const PAGE_SIZE = 16;
+    const page = Math.max(0, parseInt(String(req.query.page || '0'), 10));
     const sort = req.query.trending === '1' ? { trending: -1, createdAt: -1 } : { createdAt: -1 };
-    const items = await database.collection('prompts').find(filter).sort(sort as any).limit(200).toArray();
-    const cleaned = items.map(({ _id, ...rest }) => rest);
-    res.json({ items: cleaned });
+
+    const [items, total] = await Promise.all([
+      database.collection('prompts')
+        .find(filter)
+        .sort(sort as any)
+        .skip(page * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+        .toArray(),
+      database.collection('prompts').countDocuments(filter),
+    ]);
+
+    // Strip base64 thumbnails from list response (they can be MB-sized).
+    // URL-based thumbnails (new uploads via Object Storage) are tiny and kept as-is.
+    const cleaned = items.map(({ _id, thumbnail, ...rest }) => ({
+      ...rest,
+      thumbnail: thumbnail && !String(thumbnail).startsWith('data:') ? thumbnail : '',
+    }));
+    res.json({ items: cleaned, total, page, pageSize: PAGE_SIZE, hasMore: (page + 1) * PAGE_SIZE < total });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
