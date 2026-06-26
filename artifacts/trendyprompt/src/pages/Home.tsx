@@ -6,17 +6,21 @@ import {
   Search, Copy, Check, ArrowLeft, X, Image as ImageIcon, Video,
   Sparkles, ExternalLink, Flame, Zap,
   MessageCircle, Send, Instagram, Twitter, Youtube, Volume2, VolumeX,
-  Globe,
+  Globe, ChevronLeft, ChevronRight, Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-const TOOLS = ['ChatGPT', 'Gemini', 'Veo', 'Kling', 'Midjourney', 'Sora', 'Runway']
+const TOOLS = ['ChatGPT', 'Gemini', 'Veo', 'Kling', 'Midjourney', 'Sora', 'Runway', 'Ideogram']
 const TYPES = [
   { key: 'image', label: 'Images', icon: ImageIcon },
   { key: 'video', label: 'Videos', icon: Video },
+]
+const GENDERS = [
+  { key: 'female', label: 'Girls', emoji: '👩' },
+  { key: 'male', label: 'Boys', emoji: '👨' },
 ]
 const SUGGESTIONS = ['cinematic', 'portrait', 'Veo', 'Kling reels', 'wallpaper', 'futuristic']
 
@@ -67,6 +71,8 @@ interface Prompt {
   thumbnail: string
   videoUrl?: string
   prompt: string
+  gender?: 'male' | 'female' | null
+  images?: string[]
   instructions?: string[]
   toolLinks?: { name: string; url: string }[]
   trending?: boolean
@@ -142,6 +148,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
   const [search, setSearch] = useState('')
   const [type, setType] = useState<string | null>(null)
   const [tool, setTool] = useState<string | null>(null)
+  const [gender, setGender] = useState<string | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const loadingMoreRef = useRef(false)
@@ -153,10 +160,11 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
     if (search) qs.set('search', search)
     if (type) qs.set('type', type)
     if (tool) qs.set('tool', tool)
+    if (gender) qs.set('gender', gender)
     if (trendingOnly) qs.set('trending', '1')
     qs.set('page', String(pageNum))
     return qs.toString()
-  }, [search, type, tool, trendingOnly])
+  }, [search, type, tool, gender, trendingOnly])
 
   const load = useCallback(async () => {
     setItems(null)
@@ -202,7 +210,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
     return () => observer.disconnect()
   }, [loadMore])
 
-  useEffect(() => { load() }, [type, tool, trendingOnly])
+  useEffect(() => { load() }, [type, tool, gender, trendingOnly])
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [search])
   useEffect(() => { api('/settings').then(setSettings).catch(() => {}) }, [])
 

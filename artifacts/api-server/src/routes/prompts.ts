@@ -172,6 +172,8 @@ router.get('/prompts', async (req, res) => {
     if (type && ['image', 'video'].includes(type)) filter.type = type;
     if (tool) filter.tools = tool;
     if (req.query.trending === '1') filter.trending = true;
+    const gender = req.query.gender as string;
+    if (gender && ['male', 'female'].includes(gender)) filter.gender = gender;
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },

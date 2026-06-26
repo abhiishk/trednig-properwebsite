@@ -14,7 +14,11 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
-const TOOLS = ['ChatGPT', 'Gemini', 'Veo', 'Kling', 'Midjourney', 'Sora', 'Runway']
+const TOOLS = ['ChatGPT', 'Gemini', 'Veo', 'Kling', 'Midjourney', 'Sora', 'Runway', 'Ideogram']
+const GENDERS = [
+  { key: 'male', label: 'Male' },
+  { key: 'female', label: 'Female' },
+]
 const TYPES = [
   { key: 'image', label: 'Images', icon: ImageIcon },
   { key: 'video', label: 'Videos', icon: Video },
@@ -66,6 +70,8 @@ interface Prompt {
   toolLinks: { name: string; url: string }[]
   trending: boolean
   published: boolean
+  gender?: 'male' | 'female' | null
+  images?: string[]
 }
 
 interface FormState {
@@ -79,6 +85,8 @@ interface FormState {
   toolLinks: { name: string; url: string }[]
   published: boolean
   trending: boolean
+  gender: string
+  images: string[]
 }
 
 export default function AdminPage() {
@@ -296,12 +304,14 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
   const [form, setForm] = useState<FormState>({
     title: '', type: 'image', tools: [], thumbnail: '', videoUrl: '',
     prompt: '', instructions: [''], toolLinks: [{ name: '', url: '' }],
-    published: true, trending: false,
+    published: true, trending: false, gender: '', images: [],
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
+  const [extraUploading, setExtraUploading] = useState(false)
   const imageRef = useRef<HTMLInputElement>(null)
+  const extraImagesRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!editId) return
@@ -314,6 +324,7 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
         instructions: d.instructions?.length ? d.instructions : [''],
         toolLinks: d.toolLinks?.length ? d.toolLinks : [{ name: '', url: '' }],
         published: d.published !== false, trending: !!d.trending,
+        gender: d.gender || '', images: d.images || [],
       })
     }).catch((e: any) => toast.error(e.message)).finally(() => setLoading(false))
   }, [editId])
@@ -342,6 +353,28 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
     setImageUploading(false)
     if (imageRef.current) imageRef.current.value = ''
   }
+
+  const handleExtraImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    setExtraUploading(true)
+    let uploaded = 0
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue
+      try {
+        const url = await uploadImageToStorage(file)
+        setForm(f => ({ ...f, images: [...f.images, url] }))
+        uploaded++
+      } catch (err: any) {
+        toast.error(`Failed: ${file.name}`)
+      }
+    }
+    if (uploaded) toast.success(`${uploaded} image${uploaded > 1 ? 's' : ''} added`)
+    setExtraUploading(false)
+    if (extraImagesRef.current) extraImagesRef.current.value = ''
+  }
+
+  const removeExtraImage = (i: number) => setForm(f => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }))
 
   const save = async () => {
     if (!form.title || !form.prompt) { toast.error('Title and prompt are required'); return }
