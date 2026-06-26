@@ -36,7 +36,7 @@ export async function copyText(text: string) {
   catch { return false }
 }
 
-// Hash routing
+// Hash routing with URL path fallback for direct navigation (e.g. /trending, /p/:id)
 function useHashRoute() {
   const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash : '')
   useEffect(() => {
@@ -44,7 +44,18 @@ function useHashRoute() {
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
-  const parts = (hash.replace(/^#\/?/, '')).split('/').filter(Boolean)
+
+  let parts: string[]
+  const cleanHash = hash.replace(/^#\/?/, '')
+  if (cleanHash) {
+    // In-page hash navigation (#/p/:id, #/trending)
+    parts = cleanHash.split('/').filter(Boolean)
+  } else {
+    // Direct URL path navigation (/trending, /p/:id)
+    const path = typeof window !== 'undefined' ? window.location.pathname : ''
+    parts = path.replace(/^\//, '').split('/').filter(p => p && p !== import.meta.env.BASE_URL.replace(/\//g, ''))
+  }
+
   return { hash, parts, navigate: (h: string) => { window.location.hash = h; window.scrollTo({ top: 0 }) } }
 }
 

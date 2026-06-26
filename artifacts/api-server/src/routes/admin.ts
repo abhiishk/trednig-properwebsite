@@ -3,12 +3,15 @@ import { v4 as uuidv4 } from "uuid";
 import { getDb, isAuthed } from "../lib/mongo";
 import { objectStorageClient } from "../lib/objectStorage";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'trendyprompt2025';
-
 const router = Router();
 
 router.post('/admin/login', async (req, res) => {
   try {
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+    if (!ADMIN_PASSWORD) {
+      res.status(500).json({ error: 'ADMIN_PASSWORD environment variable is not set' });
+      return;
+    }
     const body = req.body;
     if (!body.password || body.password !== ADMIN_PASSWORD) {
       res.status(401).json({ error: 'Invalid password' });
