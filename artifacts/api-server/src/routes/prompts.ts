@@ -193,12 +193,7 @@ router.get('/prompts', async (req, res) => {
       database.collection('prompts').countDocuments(filter),
     ]);
 
-    // Strip base64 thumbnails from list response (they can be MB-sized).
-    // URL-based thumbnails (new uploads via Object Storage) are tiny and kept as-is.
-    const cleaned = items.map(({ _id, thumbnail, ...rest }) => ({
-      ...rest,
-      thumbnail: thumbnail && !String(thumbnail).startsWith('data:') ? thumbnail : '',
-    }));
+    const cleaned = items.map(({ _id, ...rest }) => rest);
     res.json({ items: cleaned, total, page, pageSize: PAGE_SIZE, hasMore: (page + 1) * PAGE_SIZE < total });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
