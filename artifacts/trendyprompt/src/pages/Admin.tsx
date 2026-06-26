@@ -160,15 +160,36 @@ function AdminLogin({ onSuccess, goHome }: { onSuccess: () => void; goHome: () =
 
 function Dashboard({ navigate, goHome, onLogout }: { navigate: (h: string) => void; goHome: () => void; onLogout: () => void }) {
   const [items, setItems] = useState<Prompt[] | null>(null)
+  const [base64Count, setBase64Count] = useState(0)
+  const [migrating, setMigrating] = useState(false)
 
   const load = async () => {
     try {
-      // Admin list fetches all pages (up to 200) with thumbnails included via ?all=1
       const data = await api('/prompts?all=1')
       setItems(data.items || [])
     } catch (e: any) { toast.error(e.message) }
   }
-  useEffect(() => { load() }, [])
+
+  const checkMigrationStatus = async () => {
+    try {
+      const r = await api('/admin/migrate-images/status')
+      setBase64Count(r.base64Count || 0)
+    } catch {}
+  }
+
+  useEffect(() => { load(); checkMigrationStatus() }, [])
+
+  const runMigration = async () => {
+    if (!confirm(`Migrate ${base64Count} base64 image(s) to cloud storage? This may take a minute.`)) return
+    setMigrating(true)
+    try {
+      const r = await api('/admin/migrate-images', { method: 'POST' })
+      toast.success(`Migrated ${r.migrated} image(s) to cloud storage.${r.failed ? ` ${r.failed} failed.` : ''}`)
+      setBase64Count(0)
+      load()
+    } catch (e: any) { toast.error(e.message) }
+    setMigrating(false)
+  }
 
   const del = async (id: string) => {
     if (!confirm('Delete this prompt?')) return
@@ -214,6 +235,24 @@ function Dashboard({ navigate, goHome, onLogout }: { navigate: (h: string) => vo
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="font-serif-display text-3xl tracking-tight">Manage prompts</h1>
         <p className="text-sm text-neutral-500 mt-1">Create, edit, publish or mark trending.</p>
+
+        {base64Count > 0 && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                {base64Count} image{base64Count !== 1 ? 's' : ''} still stored as base64
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">Migrate them to cloud storage to fix slow page loads.</p>
+            </div>
+            <button
+              onClick={runMigration}
+              disabled={migrating}
+              className="shrink-0 inline-flex items-center gap-1.5 px-4 h-9 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition disabled:opacity-60"
+            >
+              {migrating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Migrating…</> : <><Upload className="w-3.5 h-3.5" /> Migrate images</>}
+            </button>
+          </div>
+        )}
 
         <div className="mt-6 grid gap-3">
           {items === null && <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />}
