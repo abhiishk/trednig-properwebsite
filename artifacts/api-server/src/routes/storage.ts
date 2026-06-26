@@ -6,27 +6,42 @@ import {
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { isAuthed } from "../lib/mongo";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
+const ALLOWED_UPLOAD_CONTENT_TYPES = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+]);
+
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload.
+ * Admin-only: request a presigned URL for direct file upload to GCS.
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
+  if (!await isAuthed(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
     return;
   }
 
-  try {
-    const { name, size, contentType } = parsed.data;
+  const { name, size, contentType } = parsed.data;
 
+  if (!ALLOWED_UPLOAD_CONTENT_TYPES.has(contentType)) {
+    res.status(400).json({ error: "Content type not allowed. Must be an image." });
+    return;
+  }
+
+  try {
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
@@ -78,33 +93,25 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 /**
- * GET /storage/objects/*
+ * GET /storage/objects/uploads/*
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
+ * Serve prompt thumbnail images — intentionally public (no auth required).
+ * Only the /uploads/ sub-path is exposed; other object paths return 404.
+ * Upload access is admin-only (POST /storage/uploads/request-url requires auth).
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+
+    // Restrict serving to the uploads sub-path only
+    if (!wildcardPath.startsWith("uploads/")) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
 
     const response = await objectStorageService.downloadObject(objectFile);
 
