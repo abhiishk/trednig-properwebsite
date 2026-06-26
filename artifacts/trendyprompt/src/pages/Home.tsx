@@ -143,6 +143,10 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
   const [type, setType] = useState<string | null>(null)
   const [tool, setTool] = useState<string | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadingMoreRef = useRef(false)
+  const hasMoreRef = useRef(false)
+  const pageRef = useRef(0)
 
   const buildQs = useCallback((pageNum: number) => {
     const qs = new URLSearchParams()
@@ -157,26 +161,46 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
   const load = useCallback(async () => {
     setItems(null)
     setPage(0)
+    pageRef.current = 0
     setHasMore(false)
+    hasMoreRef.current = false
     try {
       const data = await api(`/prompts?${buildQs(0)}`)
       setItems(data.items || [])
       setHasMore(!!data.hasMore)
+      hasMoreRef.current = !!data.hasMore
       setTotal(data.total ?? 0)
     } catch (e: any) { toast.error(e.message); setItems([]) }
   }, [buildQs])
 
-  const loadMore = async () => {
-    const nextPage = page + 1
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current) return
+    loadingMoreRef.current = true
     setLoadingMore(true)
+    const nextPage = pageRef.current + 1
     try {
       const data = await api(`/prompts?${buildQs(nextPage)}`)
       setItems(prev => [...(prev || []), ...(data.items || [])])
       setHasMore(!!data.hasMore)
+      hasMoreRef.current = !!data.hasMore
       setPage(nextPage)
+      pageRef.current = nextPage
     } catch (e: any) { toast.error(e.message) }
+    loadingMoreRef.current = false
     setLoadingMore(false)
-  }
+  }, [buildQs])
+
+  // Infinite scroll — trigger loadMore when sentinel enters the viewport
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '300px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loadMore])
 
   useEffect(() => { load() }, [type, tool, trendingOnly])
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [search])
@@ -314,19 +338,11 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
                 <PromptCard key={p.id} prompt={p} onClick={() => navigate(`/p/${p.id}`)} />
               ))}
             </div>
-            {hasMore && (
-              <div className="flex justify-center mt-8 mb-4">
-                <button
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="inline-flex items-center gap-2 px-6 h-11 rounded-full border border-neutral-200 bg-white hover:bg-neutral-50 text-sm font-medium text-neutral-700 transition disabled:opacity-60"
-                >
-                  {loadingMore ? (
-                    <><span className="w-4 h-4 border-2 border-neutral-300 border-t-neutral-700 rounded-full animate-spin" /> Loading…</>
-                  ) : (
-                    <>Load more prompts</>
-                  )}
-                </button>
+            {/* Sentinel — IntersectionObserver watches this to trigger next page */}
+            <div ref={sentinelRef} className="h-1" />
+            {loadingMore && (
+              <div className="flex justify-center py-8">
+                <span className="w-6 h-6 border-2 border-neutral-200 border-t-neutral-600 rounded-full animate-spin" />
               </div>
             )}
           </>
