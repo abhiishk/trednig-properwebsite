@@ -319,6 +319,17 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
             )
           })}
           <div className="w-px self-stretch bg-neutral-200 mx-1" />
+          {GENDERS.map((g) => {
+            const active = gender === g.key
+            return (
+              <button key={g.key} onClick={() => setGender(active ? null : g.key)}
+                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-8 rounded-full text-xs font-medium transition border',
+                  active ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300')}>
+                <span>{g.emoji}</span> {g.label}
+              </button>
+            )
+          })}
+          <div className="w-px self-stretch bg-neutral-200 mx-1" />
           {TOOLS.map((tn) => {
             const active = tool === tn
             return (
@@ -395,10 +406,21 @@ function EmptyState() {
 
 function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }) {
   const isVideo = prompt.type === 'video' && !!prompt.videoUrl
+  const hasCarousel = !isVideo && (prompt.images?.length ?? 0) > 1
   const videoRef = useRef<HTMLVideoElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const [muted, setMuted] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [imgIndex, setImgIndex] = useState(0)
+
+  const prevImg = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setImgIndex(i => (i - 1 + (prompt.images?.length ?? 1)) % (prompt.images?.length ?? 1))
+  }
+  const nextImg = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setImgIndex(i => (i + 1) % (prompt.images?.length ?? 1))
+  }
 
   useEffect(() => {
     if (!isVideo) return
@@ -456,6 +478,29 @@ function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }
           preload="metadata"
           className="w-full h-auto object-cover block"
         />
+      ) : hasCarousel ? (
+        <div className="relative overflow-hidden">
+          <img
+            src={prompt.images![imgIndex]}
+            alt={prompt.title}
+            loading="lazy"
+            className="w-full h-auto object-cover block transition-opacity duration-300"
+          />
+          <button onClick={prevImg}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button onClick={nextImg}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+            {prompt.images!.map((_, di) => (
+              <button key={di} onClick={(e) => { e.stopPropagation(); setImgIndex(di) }}
+                className={cn('w-1.5 h-1.5 rounded-full transition', di === imgIndex ? 'bg-white' : 'bg-white/40')} />
+            ))}
+          </div>
+        </div>
       ) : prompt.thumbnail ? (
         <img
           src={prompt.thumbnail}

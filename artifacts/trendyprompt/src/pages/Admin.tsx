@@ -469,9 +469,55 @@ function Editor({ navigate, editId }: { navigate: (h: string) => void; editId: s
         </div>
 
         <div>
+          <div className="flex items-center justify-between">
+            <FieldLabel>Extra photos <span className="text-neutral-400 font-normal text-[11px]">(carousel — up to 9)</span></FieldLabel>
+            <Button type="button" size="sm" variant="ghost" onClick={() => extraImagesRef.current?.click()} disabled={extraUploading || form.images.length >= 9} className="h-7">
+              {extraUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+              Add photos
+            </Button>
+          </div>
+          <input ref={extraImagesRef} type="file" accept="image/*" multiple hidden onChange={handleExtraImages} />
+          {form.images.length > 0 && (
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {form.images.map((url, i) => (
+                <div key={i} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => removeExtraImage(i)}
+                    className="absolute top-1 right-1 bg-white/90 rounded-full p-0.5 hover:bg-white">
+                    <X className="w-3 h-3 text-neutral-700" />
+                  </button>
+                  <span className="absolute bottom-1 left-1 text-[9px] bg-black/50 text-white px-1 rounded">{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {form.images.length === 0 && (
+            <p className="text-[11px] text-neutral-400 mt-1">Add multiple photos to show a carousel on the card. First photo shows first.</p>
+          )}
+        </div>
+
+        <div>
           <FieldLabel>Title</FieldLabel>
           <Input className="mt-2 h-11" placeholder="e.g. Cinematic foggy portrait"
             value={form.title} onChange={(e) => setField('title', e.target.value)} />
+        </div>
+
+        <div>
+          <FieldLabel>Gender</FieldLabel>
+          <div className="mt-2 inline-flex p-1 rounded-full bg-neutral-100">
+            <button type="button" onClick={() => setField('gender', '')}
+              className={cn('px-4 h-8 rounded-full text-xs font-medium transition',
+                !form.gender ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500')}>
+              Unisex
+            </button>
+            {GENDERS.map((g) => (
+              <button key={g.key} type="button" onClick={() => setField('gender', form.gender === g.key ? '' : g.key)}
+                className={cn('px-4 h-8 rounded-full text-xs font-medium transition',
+                  form.gender === g.key ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500')}>
+                {g.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
