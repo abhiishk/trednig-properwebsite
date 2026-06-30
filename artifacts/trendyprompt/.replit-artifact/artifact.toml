@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "TrendyPrompt"
+version = "1.0.0"
+id = "artifacts/trendyprompt"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22300
+
+[services.development]
+run = "pnpm --filter @workspace/trendyprompt run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/trendyprompt", "run", "build" ]
+publicDir = "artifacts/trendyprompt/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22300"
+BASE_PATH = "/"
