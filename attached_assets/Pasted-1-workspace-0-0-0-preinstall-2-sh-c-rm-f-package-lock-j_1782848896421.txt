@@ -1,0 +1,140 @@
+1
+
+> workspace@0.0.0 preinstall
+
+2
+
+> sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) npm install -g pnpm@9 --quiet ;; esac'
+
+3
+
+
+4
+
+npm error code ENOENT
+
+5
+
+npm error syscall mkdir
+
+6
+
+npm error path /opt/alt/alt-nodejs22/root/usr/lib/node_modules/pnpm
+
+7
+
+npm error errno -2
+
+8
+
+npm error enoent ENOENT: no such file or directory, mkdir '/opt/alt/alt-nodejs22/root/usr/lib/node_modules/pnpm'
+
+9
+
+npm error enoent This is related to npm not being able to find a file.
+
+10
+
+npm error enoent
+
+11
+
+npm error A complete log of this run can be found in: /home/u207566750/.npm/_logs/2026-06-30T19_46_39_108Z-debug-0.log
+
+12
+
+npm error code 254
+
+13
+
+npm error path /home/u207566750/domains/trendyprompt.space/public_html/.builds/source/repository
+
+14
+
+npm error command failed
+
+15
+
+npm error command sh -c sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) npm install -g pnpm@9 --quiet ;; esac'
+
+16
+
+npm error A complete log of this run can be found in: /home/u207566750/.npm/_logs/2026-06-30T19_46_37_868Z-debug-0.log
+
+17
+
+ERROR: Failed to install dependencies
+
+18
+
+NOTICE: Attempting to install with legacy peer dependencies enabled
+
+19
+
+
+20
+
+> workspace@0.0.0 preinstall
+
+21
+
+> sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) npm install -g pnpm@9 --quiet ;; esac'
+
+22
+
+
+23
+
+npm error code ENOENT
+
+24
+
+npm error syscall mkdir
+
+25
+
+npm error path /opt/alt/alt-nodejs22/root/usr/lib/node_modules/pnpm
+
+26
+
+npm error errno -2
+
+27
+
+npm error enoent ENOENT: no such file or directory, mkdir '/opt/alt/alt-nodejs22/root/usr/lib/node_modules/pnpm'
+
+28
+
+npm error enoent This is related to npm not being able to find a file.
+
+29
+
+npm error enoent
+
+30
+
+npm error A complete log of this run can be found in: /home/u207566750/.npm/_logs/2026-06-30T19_46_41_780Z-debug-0.log
+
+31
+
+npm error code 254
+
+32
+
+npm error path /home/u207566750/domains/trendyprompt.space/public_html/.builds/source/repository
+
+33
+
+npm error command failed
+
+34
+
+npm error command sh -c sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) npm install -g pnpm@9 --quiet ;; esac'
+
+35
+
+npm error A complete log of this run can be found in: /home/u207566750/.npm/_logs/2026-06-30T19_46_40_915Z-debug-0.log
+
+36
+
+ERROR: Failed to install dependencies
