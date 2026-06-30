@@ -24,13 +24,15 @@ const TYPES = [
   { key: 'video', label: 'Videos', icon: Video },
 ]
 
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 function getToken() { return localStorage.getItem('tp_token') }
 function setToken(t: string | null) { if (t) localStorage.setItem('tp_token', t); else localStorage.removeItem('tp_token') }
 async function api(path: string, opts: RequestInit & { headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const t = getToken()
   if (t) headers['Authorization'] = `Bearer ${t}`
-  const res = await fetch(`/api${path}`, { ...opts, headers })
+  const res = await fetch(`${API_BASE}/api${path}`, { ...opts, headers })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error((data as any).error || 'Request failed')
   return data
@@ -38,7 +40,7 @@ async function api(path: string, opts: RequestInit & { headers?: Record<string, 
 
 async function uploadImageToStorage(file: File): Promise<string> {
   // Step 1: request a presigned PUT URL from our backend
-  const res = await fetch('/api/storage/uploads/request-url', {
+  const res = await fetch(`${API_BASE}/api/storage/uploads/request-url`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
@@ -55,7 +57,7 @@ async function uploadImageToStorage(file: File): Promise<string> {
   if (!uploadRes.ok) throw new Error('Upload to storage failed')
 
   // objectPath is like /objects/uploads/<uuid> — serving URL is /api/storage + objectPath
-  return `/api/storage${objectPath}`
+  return `${API_BASE}/api/storage${objectPath}`
 }
 
 interface Prompt {

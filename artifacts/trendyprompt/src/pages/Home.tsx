@@ -25,11 +25,13 @@ const GENDERS = [
 const SUGGESTIONS = ['cinematic', 'portrait', 'Veo', 'Kling reels', 'wallpaper', 'futuristic']
 
 function getToken() { return localStorage.getItem('tp_token') }
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 export async function api(path: string, opts: RequestInit & { headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const t = getToken()
   if (t) headers['Authorization'] = `Bearer ${t}`
-  const res = await fetch(`/api${path}`, { ...opts, headers })
+  const res = await fetch(`${API_BASE}/api${path}`, { ...opts, headers })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error((data as any).error || 'Request failed')
   return data
