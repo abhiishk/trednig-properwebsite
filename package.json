@@ -9,6 +9,9 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "packageManager": "pnpm@11.9.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "@esbuild/linux-x64", "@esbuild/darwin-arm64", "@esbuild/darwin-x64"]
+  },
   "private": true,
   "devDependencies": {
     "prettier": "^3.8.4",
