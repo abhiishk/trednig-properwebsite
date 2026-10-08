@@ -1,0 +1,60 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api-server": {
+      "root": "artifacts/api-server",
+      "framework": "express",
+      "entrypoint": "src/app.ts",
+      "buildCommand": "pnpm exec tsc -b ../../lib/api-zod",
+      "installCommand": "pnpm install --frozen-lockfile"
+    },
+    "mockup-sandbox": {
+      "root": "artifacts/mockup-sandbox",
+      "framework": "vite",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist",
+      "installCommand": "pnpm install --frozen-lockfile"
+    },
+    "trendyprompt": {
+      "root": "artifacts/trendyprompt",
+      "framework": "vite",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist/public",
+      "rewrites": [
+        {
+          "source": "/admin",
+          "destination": "/index.html"
+        },
+        {
+          "source": "/trending",
+          "destination": "/index.html"
+        },
+        {
+          "source": "/p/:id",
+          "destination": "/index.html"
+        }
+      ],
+      "installCommand": "pnpm install --frozen-lockfile"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "trendyprompt"
+      }
+    }
+  ]
+}

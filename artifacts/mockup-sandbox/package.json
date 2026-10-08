@@ -70,5 +70,6 @@
     "vaul": "^1.1.2",
     "vite": "catalog:",
     "zod": "catalog:"
-  }
+  },
+  "packageManager": "pnpm@11.9.0"
 }

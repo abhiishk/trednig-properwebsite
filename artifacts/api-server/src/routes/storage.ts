@@ -11,6 +11,15 @@ import { isAuthed } from "../lib/mongo";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
+// Replit's storage credential sidecar does not exist on Vercel.
+router.use('/storage', (_req, res, next) => {
+  if (process.env.VERCEL && !process.env.REPL_ID) {
+    res.status(503).json({ error: 'Uploads are unavailable on this host. Paste a hosted image URL instead.' });
+    return;
+  }
+  next();
+});
+
 const ALLOWED_UPLOAD_CONTENT_TYPES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
 ]);
