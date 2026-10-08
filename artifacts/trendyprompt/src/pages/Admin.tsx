@@ -28,7 +28,7 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 
 function getToken() { return localStorage.getItem('tp_token') }
 function setToken(t: string | null) { if (t) localStorage.setItem('tp_token', t); else localStorage.removeItem('tp_token') }
-async function api(path: string, opts: RequestInit & { headers?: Record<string, string> } = {}) {
+async function api(path: string, opts: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const t = getToken()
   if (t) headers['Authorization'] = `Bearer ${t}`

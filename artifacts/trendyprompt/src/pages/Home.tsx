@@ -27,7 +27,7 @@ const SUGGESTIONS = ['cinematic', 'portrait', 'Veo', 'Kling reels', 'wallpaper',
 function getToken() { return localStorage.getItem('tp_token') }
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 
-export async function api(path: string, opts: RequestInit & { headers?: Record<string, string> } = {}) {
+export async function api(path: string, opts: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const t = getToken()
   if (t) headers['Authorization'] = `Bearer ${t}`
@@ -79,6 +79,11 @@ interface Prompt {
   toolLinks?: { name: string; url: string }[]
   trending?: boolean
   published?: boolean
+}
+
+function resolvePromptImages(prompt: Prompt): Prompt {
+  const resolve = (url: string) => url?.startsWith('/api/') ? `${API_BASE}${url}` : url
+  return { ...prompt, thumbnail: resolve(prompt.thumbnail), images: prompt.images?.map(resolve) }
 }
 
 interface Settings {
@@ -176,7 +181,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
     hasMoreRef.current = false
     try {
       const data = await api(`/prompts?${buildQs(0)}`)
-      setItems(data.items || [])
+      setItems((data.items || []).map(resolvePromptImages))
       setHasMore(!!data.hasMore)
       hasMoreRef.current = !!data.hasMore
       setTotal(data.total ?? 0)
@@ -190,7 +195,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
     const nextPage = pageRef.current + 1
     try {
       const data = await api(`/prompts?${buildQs(nextPage)}`)
-      setItems(prev => [...(prev || []), ...(data.items || [])])
+      setItems(prev => [...(prev || []), ...(data.items || []).map(resolvePromptImages)])
       setHasMore(!!data.hasMore)
       hasMoreRef.current = !!data.hasMore
       setPage(nextPage)
@@ -212,8 +217,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
     return () => observer.disconnect()
   }, [loadMore])
 
-  useEffect(() => { load() }, [type, tool, gender, trendingOnly])
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [search])
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
   useEffect(() => { api('/settings').then(setSettings).catch(() => {}) }, [])
 
   const stats = useMemo(() => {
@@ -254,7 +258,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
               Viral AI prompts
               <br />
               <span className="bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
-                that actually slap.
+                for your next creation.
               </span>
             </h1>
           )}
@@ -262,7 +266,7 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
           <p className="text-[15px] sm:text-lg text-neutral-600 mt-4 max-w-xl">
             {trendingOnly
               ? 'The hottest image and video prompts everyone is remixing right now.'
-              : 'Hand-picked prompts for ChatGPT, Gemini, Veo, Kling, Midjourney & Sora. Copy. Paste. Post. Go viral.'}
+              : 'Hand-picked prompts for ChatGPT, Gemini, Veo, Kling, Midjourney & Sora. Find a style you love, copy the prompt, and create something new.'}
           </p>
 
           {stats && (
@@ -278,13 +282,14 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
               <Input
+                aria-label="Search prompts by style or AI tool"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search a vibe, model or style…"
                 className="pl-11 pr-11 h-12 rounded-2xl border-neutral-200 bg-white shadow-sm focus-visible:ring-2 focus-visible:ring-neutral-900"
               />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700">
+                <button aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -313,8 +318,8 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
             const Icon = t.icon
             const active = type === t.key
             return (
-              <button key={t.key} onClick={() => setType(active ? null : t.key)}
-                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-8 rounded-full text-xs font-medium transition border',
+              <button key={t.key} aria-pressed={active} onClick={() => setType(active ? null : t.key)}
+                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-11 rounded-full text-xs font-medium transition border',
                   active ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300')}>
                 <Icon className="w-3.5 h-3.5" /> {t.label}
               </button>
@@ -324,8 +329,8 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
           {GENDERS.map((g) => {
             const active = gender === g.key
             return (
-              <button key={g.key} onClick={() => setGender(active ? null : g.key)}
-                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-8 rounded-full text-xs font-medium transition border',
+              <button key={g.key} aria-pressed={active} onClick={() => setGender(active ? null : g.key)}
+                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-11 rounded-full text-xs font-medium transition border',
                   active ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300')}>
                 <span>{g.emoji}</span> {g.label}
               </button>
@@ -335,15 +340,15 @@ function HomeView({ navigate, trendingOnly }: { navigate: (h: string) => void; t
           {TOOLS.map((tn) => {
             const active = tool === tn
             return (
-              <button key={tn} onClick={() => setTool(active ? null : tn)}
-                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-8 rounded-full text-xs font-medium transition border',
+              <button key={tn} aria-pressed={active} onClick={() => setTool(active ? null : tn)}
+                className={cn('shrink-0 inline-flex items-center gap-1.5 px-3.5 h-11 rounded-full text-xs font-medium transition border',
                   active ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300')}>
                 {tn}
               </button>
             )
           })}
-          {(type || tool || search) && (
-            <button onClick={() => { setType(null); setTool(null); setSearch('') }}
+          {(type || tool || gender || search) && (
+            <button onClick={() => { setType(null); setTool(null); setGender(null); setSearch('') }}
               className="shrink-0 inline-flex items-center gap-1 px-3 h-8 rounded-full text-xs text-neutral-500 hover:text-neutral-900">
               <X className="w-3 h-3" /> Clear
             </button>
@@ -486,19 +491,20 @@ function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }
             src={prompt.images![imgIndex]}
             alt={prompt.title}
             loading="lazy"
+            decoding="async"
             className="w-full h-auto object-cover block transition-opacity duration-300"
           />
-          <button onClick={prevImg}
-            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
+          <button aria-label="Previous image" onClick={prevImg}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={nextImg}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
+          <button aria-label="Next image" onClick={nextImg}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/40 hover:bg-black/60 grid place-items-center text-white backdrop-blur-sm">
             <ChevronRight className="w-4 h-4" />
           </button>
           <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
             {prompt.images!.map((_, di) => (
-              <button key={di} onClick={(e) => { e.stopPropagation(); setImgIndex(di) }}
+              <button aria-label={`Show image ${di + 1}`} key={di} onClick={(e) => { e.stopPropagation(); setImgIndex(di) }}
                 className={cn('w-1.5 h-1.5 rounded-full transition', di === imgIndex ? 'bg-white' : 'bg-white/40')} />
             ))}
           </div>
@@ -508,6 +514,7 @@ function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }
           src={prompt.thumbnail}
           alt={prompt.title}
           loading="lazy"
+            decoding="async"
           className="w-full h-auto object-cover block transition duration-500 group-hover:scale-[1.02]"
         />
       ) : (
@@ -531,16 +538,18 @@ function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }
       <div className="absolute top-2 right-2 flex items-center gap-1.5">
         {isVideo && (
           <button
+            aria-label={muted ? "Unmute video" : "Mute video"}
             onClick={toggleMute}
-            className="grid place-items-center w-7 h-7 rounded-full bg-white/90 backdrop-blur hover:bg-white shadow-sm"
+            className="grid place-items-center w-11 h-11 rounded-full bg-white/90 backdrop-blur hover:bg-white shadow-sm"
           >
             {muted ? <VolumeX className="w-3.5 h-3.5 text-neutral-700" /> : <Volume2 className="w-3.5 h-3.5 text-neutral-900" />}
           </button>
         )}
         <button
+          aria-label={copied ? "Prompt copied" : "Copy prompt"}
           onClick={quickCopy}
           className={cn(
-            'grid place-items-center w-7 h-7 rounded-full backdrop-blur shadow-sm transition',
+            'grid place-items-center w-11 h-11 rounded-full backdrop-blur shadow-sm transition',
             copied ? 'bg-emerald-500 text-white' : 'bg-white/90 hover:bg-white text-neutral-700'
           )}
         >
@@ -550,9 +559,9 @@ function PromptCard({ prompt, onClick }: { prompt: Prompt; onClick: () => void }
 
       <div className={cn(
         'absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 via-black/30 to-transparent transition',
-        isVideo ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        'opacity-100'
       )}>
-        <p className="text-white text-sm font-medium line-clamp-2 drop-shadow">{prompt.title}</p>
+        <button onClick={(e) => { e.stopPropagation(); onClick() }} className="text-left text-white text-sm font-medium line-clamp-2 drop-shadow underline-offset-4 hover:underline">{prompt.title}</button>
         <div className="flex flex-wrap gap-1 mt-1">
           {(prompt.tools || []).slice(0, 3).map((t) => (
             <span key={t} className="text-[10px] text-white/95 bg-white/15 backdrop-blur px-1.5 py-0.5 rounded">{t}</span>
@@ -750,6 +759,10 @@ function Footer({ settings }: { settings: Settings | null }) {
           </>
         )}
         <div className="mt-7 pt-5 border-t border-neutral-100">
+          <p className="text-sm text-neutral-600 mb-3">
+            Designed by{' '}
+            <a href="https://www.gmtworld.space/" target="_blank" rel="noopener noreferrer" className="font-semibold text-neutral-900 underline underline-offset-4 hover:text-fuchsia-600">GMTWorld.space</a>
+          </p>
           <p className="text-[12px] text-neutral-500">
             Made with <span className="text-pink-500">&#9829;</span> by{' '}
             <span className="font-semibold text-neutral-900">Abhishek Sharma</span>

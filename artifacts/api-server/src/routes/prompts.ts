@@ -195,11 +195,35 @@ router.get('/prompts', async (req, res) => {
       database.collection('prompts').countDocuments(filter),
     ]);
 
-    const cleaned = items.map(({ _id, ...rest }) => rest);
+    const cleaned = items.map(({ _id, ...rest }) => ({
+      ...rest,
+      thumbnail: typeof rest.thumbnail === 'string' && rest.thumbnail.startsWith('data:')
+        ? `/api/prompts/${encodeURIComponent(rest.id)}/image/thumbnail?v=${rest.updatedAt || 0}` : rest.thumbnail,
+      images: Array.isArray(rest.images) ? rest.images.map((image: string, index: number) =>
+        image.startsWith('data:') ? `/api/prompts/${encodeURIComponent(rest.id)}/image/${index}?v=${rest.updatedAt || 0}` : image
+      ) : rest.images,
+    }));
     res.json({ items: cleaned, total, page, pageSize: PAGE_SIZE, hasMore: (page + 1) * PAGE_SIZE < total });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Deliver embedded images separately so listing JSON stays small and lazy loading works.
+router.get('/prompts/:id/image/:image', async (req, res) => {
+  try {
+    const database = await getDb();
+    const doc = await database.collection('prompts').findOne({ id: req.params.id });
+    if (!doc || (!doc.published && !(await isAuthed(req)))) { res.sendStatus(404); return; }
+    const index = String(req.params.image);
+    const image = index === 'thumbnail' ? doc.thumbnail
+      : /^\d+$/.test(index) ? doc.images?.[Number(index)] : undefined;
+    const match = typeof image === 'string' ? image.match(/^data:(image\/(?:png|jpeg|webp|gif|avif));base64,([A-Za-z0-9+/=\s]+)$/) : null;
+    if (!match) { res.sendStatus(404); return; }
+    res.set('Cache-Control', doc.published ? 'public, max-age=300' : 'private, no-store');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.type(match[1]).send(Buffer.from(match[2], 'base64'));
+  } catch { res.status(500).json({ error: 'Image could not be loaded' }); }
 });
 
 router.get('/prompts/:id', async (req, res) => {

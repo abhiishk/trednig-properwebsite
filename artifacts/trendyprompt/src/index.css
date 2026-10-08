@@ -133,3 +133,17 @@
     animation: shimmer 1.5s infinite;
   }
 }
+
+/* Keep small-screen cards readable and respect motion preferences. */
+@media (max-width: 379px) {
+  .masonry { columns: 1; }
+}
+:focus-visible { outline: 2px solid #c026d3; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
